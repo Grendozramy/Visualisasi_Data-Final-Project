@@ -1,16 +1,14 @@
-import bokeh
-import pandas as pd
-import numpy as np
 from bokeh.io import curdoc, output_notebook
 from bokeh.models.tools import HoverTool
 from bokeh.models import DateRangeSlider,  ColumnDataSource, PreText, Select, Range1d, RadioButtonGroup, Div, CustomJS, Button
 from bokeh.plotting import figure, output_file, show
 from bokeh.layouts import column, row
-from bokeh.models.glyphs import Line
+import bokeh
+import pandas as pd
+import numpy as np
 from os.path import dirname, join
 import locale
 locale.setlocale(locale.LC_ALL, 'id_ID.utf8')
-
 # import data
 df_confirmed = pd.read_csv(
     join(dirname(__file__), 'data', 'confirmed.csv'), parse_dates=['date'])
@@ -94,6 +92,7 @@ def handle_region_change(attrname, old, new):
 
 
 def handle_case_change(attrname, old, new):
+    from bokeh.models.glyphs import Line
     global case
     cases = ["confirmed", "recovered", "death", 'all']
     case = cases[new]
@@ -140,6 +139,16 @@ def handle_range_change(attrname, old, new):
     slider_value = range_slider.value_as_datetime
     update(date_range=slider_value)
 
+
+def change_theme():
+    global theme
+    if theme == "caliber":
+        theme = 'dark_minimal'
+    else:
+        theme = "caliber"
+    curdoc().theme = theme
+
+
 # Default value
 stats = PreText(text='', width=500)
 case = "confirmed"
@@ -148,6 +157,7 @@ source = create_source(region, case)
 total_data = len(source.data['date'])-1
 case_date = pd.to_datetime(source.data['date'])
 slider_value = case_date[0], case_date[-1]
+theme = 'dark_minimal'
 
 # html template
 total_case_template = ("""
@@ -187,6 +197,7 @@ region_select = Select(value=region, title='Country/Region',
                        options=list(regions_confirmed), name="region_select")
 range_slider = DateRangeSlider(
     start=slider_value[0], end=slider_value[1], value=(0, slider_value[1]), title='Date', name="range_slider")
+button = Button(label="Change theme", button_type="success")
 
 # onchange
 region_select.on_change('value', handle_region_change)
@@ -207,15 +218,27 @@ region_select.js_on_change('value', js_on_change_region)
 
 case_select.on_change('active', handle_case_change)
 range_slider.on_change('value', handle_range_change)
+button.on_click(change_theme)
 plt = make_plot(source, case.capitalize() + " case in " +
                 region, case, sizing_mode="stretch_both")
 
-
-controls = column(region_select,  case_select, range_slider,
-                  confirmed_case, death_case, recovered_case,)
+# Layouting
+about_text = """
+    <div style="width:300px;">
+        <ul class="list-group">
+            <li class="list-group-item">Guido Tamara</li>
+            <li class="list-group-item">Firyal Yamiza Akbar</li>
+            <li class="list-group-item">Kurniawan Malik Ibrahim</li>
+        </ul>
+    </div>
+"""
+about = Div(text=about_text, width_policy="max")
+controls = column(region_select,  case_select, range_slider, button,
+                  confirmed_case, death_case, recovered_case,  row(about, sizing_mode="stretch_width"))
 main_layout = column(
     row(global_confirmed_case, global_death_case, global_recovered_case,
         sizing_mode="stretch_width", width_policy='max'),
     row(controls, plt, sizing_mode="stretch_height"), sizing_mode="stretch_both")
 curdoc().add_root(main_layout)
 curdoc().title = "Covid-19 case"
+curdoc().theme = theme
